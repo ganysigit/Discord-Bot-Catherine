@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { MessageEmbed, MessageActionRow, MessageSelectMenu } = require('discord.js');
 const sqlite3 = require('sqlite3').verbose();
+const { MessageEmbed, MessageActionRow, MessageSelectMenu } = require('discord.js');
 
 class UIDCommand {
   static data = new SlashCommandBuilder()

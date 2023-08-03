@@ -1,4 +1,4 @@
-const { Client, Intents } = require('discord.js');
+const { Client, Intents, MessageEmbed, MessageActionRow, MessageSelectMenu } = require('discord.js');
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 const { UIDCommand } = require('./commands/UIDCommand');
@@ -30,25 +30,7 @@ const client = new Client({
 
 const rest = new REST({ version: '9' }).setToken(process.env.DISCORD_TOKEN);
 
-(async () => {
-  try {
-    console.log('Started refreshing application (/) commands.');
-
-    await rest.put(
-      Routes.applicationGuildCommands(clientId, guildId),
-      { body: commands },
-    );
-
-    console.log('Successfully reloaded application (/) commands.');
-  } catch (error) {
-    console.error(error);
-  }
-})();
-
-client.once('ready', () => {
-  console.log(`Logged in as ${client.user.tag}!`);
-});
-
+// Register the interactionCreate event listener here
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isCommand()) return;
 
@@ -67,11 +49,10 @@ client.on('interactionCreate', async (interaction) => {
         ephemeral: true,
       });
     }
-  } else if (commandName === 'adduid' || commandName === 'myuid' || commandName === 'changeuid' || commandName === 'gacha') {
-    const command = commandName === 'gacha' ? GachaCommand : UIDCommand;
-    const cmd = new command();
+  } else if (commandName === 'gacha') {
+    const gachaCommand = new GachaCommand();
     try {
-      await cmd.execute(interaction);
+      await gachaCommand.execute(interaction);
     } catch (error) {
       console.error('Error executing command:', error);
       await interaction.reply({
@@ -82,26 +63,61 @@ client.on('interactionCreate', async (interaction) => {
   } else if (commandName === 'gachahistory') {
     const gachaCommand = new GachaCommand();
     const userId = interaction.user.id;
-    const userGachaHistory = gachaCommand.getUserGachaHistory(userId);
+    try {
+      const userGachaHistory = await gachaCommand.getUserGachaHistory(userId);
+      if (userGachaHistory.length === 0) {
+        await interaction.reply("You have not won any prizes in the gacha yet.");
+        return;
+      }
 
-    if (userGachaHistory.length === 0) {
-      await interaction.reply("You have not won any prizes in the gacha yet.");
-      return;
+      const embed = new MessageEmbed()
+        .setTitle('Gacha History')
+        .setColor('#0099ff');
+
+      userGachaHistory.forEach((prize) => {
+        embed.addFields(
+          { name: prize.title, value: prize.description },
+          { name: 'Image URL', value: prize.imageURL }
+        );
+      });
+
+      await interaction.reply({ embeds: [embed] });
+    } catch (error) {
+      console.error('Error fetching gacha history:', error);
+      await interaction.reply({
+        content: 'An error occurred while fetching gacha history.',
+        ephemeral: true,
+      });
     }
-
-    const embed = new MessageEmbed()
-      .setTitle('Gacha History')
-      .setColor('#0099ff');
-
-    userGachaHistory.forEach((prize) => {
-      embed.addFields(
-        { name: prize.title, value: prize.description },
-        { name: 'Image URL', value: prize.imageURL }
-      );
-    });
-
-    await interaction.reply({ embeds: [embed] });
+  } else if (commandName === 'adduid' || commandName === 'myuid' || commandName === 'changeuid') {
+    const uidCommand = new UIDCommand();
+    try {
+      await uidCommand.execute(interaction);
+    } catch (error) {
+      console.error('Error executing command:', error);
+      await interaction.reply({
+        content: 'An error occurred while executing the command.',
+        ephemeral: true,
+      });
+    }
   }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+(async () => {
+  try {
+    console.log('Started refreshing application (/) commands.');
+
+    await rest.put(
+      Routes.applicationGuildCommands(clientId, guildId),
+      { body: commands },
+    );
+
+    console.log('Successfully reloaded application (/) commands.');
+  } catch (error) {
+    console.error(error);
+  }
+
+  // Once the commands are registered, login to Discord
+  client.login(process.env.DISCORD_TOKEN);
+})();
+
